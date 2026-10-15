@@ -1,0 +1,49 @@
+﻿# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local databases / data
+*.db
+*.sqlite
+*.sqlite3
+data/
+storage/
+
+# Build
+dist/
+build/
+coverage/
+.next/
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Temporary
+tmp/
+temp/
+
+# Auto-generated AI tool skills (created by `prisma skills sync`)
+.agents/
+.claude/
+.cursor/
+.devin/
+
+# Prisma local artifacts
+prisma/*.db

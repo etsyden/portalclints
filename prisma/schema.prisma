@@ -1,0 +1,663 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProjectMemberRole {
+  ADMIN
+  PROJECT_MANAGER
+  EXECUTOR
+  OBSERVER
+  CLIENT
+}
+
+enum StageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
+enum RequestStatus {
+  NEW
+  NEEDS_CLIENT_INFO
+  IN_REVIEW
+  ACCEPTED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum RequestType {
+  GENERAL
+  CHANGE
+  NEW_FEATURE
+  CONTENT
+  DESIGN
+  TECHNICAL
+  QUESTION
+}
+
+enum RequestSource {
+  PORTAL
+  TELEGRAM
+  MAX
+  WHATSAPP
+  INTERNAL
+}
+
+enum TaskStatus {
+  NEW
+  READY
+  IN_PROGRESS
+  INTERNAL_REVIEW
+  CLIENT_APPROVAL
+  CHANGES_REQUIRED
+  WAITING_CLIENT
+  BLOCKED
+  APPROVED
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MaterialType {
+  FILE
+  LINK
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  REFERENCE
+  SCREENSHOT
+  OTHER
+}
+
+enum Visibility {
+  INTERNAL
+  CLIENT
+}
+
+enum MaterialVersionStatus {
+  DRAFT
+  READY
+  SHARED
+  APPROVED
+  CHANGES_REQUIRED
+  ARCHIVED
+}
+
+enum MessageChannel {
+  PORTAL
+  TELEGRAM
+  MAX
+  WHATSAPP
+}
+
+enum DecisionSourceType {
+  REQUEST
+  MATERIAL
+  MATERIAL_VERSION
+  APPROVAL
+  SELECTION
+  TASK
+  MANUAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
+enum EventType {
+  PROJECT_CREATED
+  CLIENT_JOINED_PROJECT
+  REQUEST_CREATED
+  REQUEST_UPDATED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  MATERIAL_ADDED
+  MATERIAL_SHARED
+  VERSION_CREATED
+  COMMENT_ADDED
+  MESSAGE_SENT
+  APPROVAL_REQUESTED
+  APPROVED
+  CHANGES_REQUESTED
+  DECISION_CREATED
+  SELECTION_CREATED
+  NOTIFICATION_SENT
+}
+
+enum NotificationChannel {
+  PORTAL
+  TELEGRAM
+  MAX
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationType {
+  INFO
+  ACTION_REQUIRED
+  APPROVAL_REQUIRED
+  REQUEST_UPDATE
+  MESSAGE
+  REMINDER
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model User {
+  id           String  @id @default(uuid()) @db.Uuid
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+  firstName    String  @map("first_name")
+  lastName     String  @map("last_name")
+  phone        String?
+  avatarUrl    String? @map("avatar_url")
+  isActive     Boolean @default(true) @map("is_active")
+
+  clientMemberships  ClientUser[]
+  projectMemberships ProjectMember[]
+
+  projectsCreated Project[] @relation("ProjectCreatedBy")
+  stagesCreated   Stage[]   @relation("StageCreatedBy")
+
+  requestsCreated  Request[]         @relation("RequestCreatedBy")
+  tasksAssigned    Task[]            @relation("TaskAssignee")
+  tasksCreated     Task[]            @relation("TaskCreatedBy")
+  materialsCreated Material[]        @relation("MaterialCreatedBy")
+  versionsCreated  MaterialVersion[] @relation("VersionCreatedBy")
+
+  commentsCreated       Comment[]      @relation("CommentAuthor")
+  messagesCreated       Message[]      @relation("MessageAuthor")
+  approvalsRequested    Approval[]     @relation("ApprovalRequestedBy")
+  approvalsApproved     Approval[]     @relation("ApprovalApprovedBy")
+  decisionsCreated      Decision[]     @relation("DecisionCreatedBy")
+  selectionsCreated     Selection[]    @relation("SelectionCreatedBy")
+  eventsCreated         Event[]        @relation("EventActor")
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  refreshTokens         RefreshToken[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Client {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+
+  users    ClientUser[]
+  projects Project[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("clients")
+}
+
+model ClientUser {
+  clientId String @map("client_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([clientId, userId])
+  @@index([userId])
+  @@map("client_users")
+}
+
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  clientId    String        @map("client_id") @db.Uuid
+  createdById String        @map("created_by_id") @db.Uuid
+  name        String
+  description String?
+  status      ProjectStatus @default(DRAFT)
+
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy User   @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  members   ProjectMember[]
+  stages    Stage[]
+  requests  Request[]
+  tasks     Task[]
+  materials Material[]
+
+  comments      Comment[]
+  messages      Message[]
+  approvals     Approval[]
+  decisions     Decision[]
+  selections    Selection[]
+  events        Event[]
+  notifications Notification[]
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([clientId])
+  @@index([createdById])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid()) @db.Uuid
+  projectId String            @map("project_id") @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  role      ProjectMemberRole
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId, role])
+  @@map("project_members")
+}
+
+model Stage {
+  id          String      @id @default(uuid()) @db.Uuid
+  projectId   String      @map("project_id") @db.Uuid
+  createdById String      @map("created_by_id") @db.Uuid
+  name        String
+  description String?
+  position    Int
+  status      StageStatus @default(NOT_STARTED)
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("StageCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  tasks Task[]
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@unique([projectId, position])
+  @@index([projectId, status])
+  @@map("stages")
+}
+
+model Request {
+  id          String        @id @default(uuid()) @db.Uuid
+  projectId   String        @map("project_id") @db.Uuid
+  createdById String        @map("created_by_id") @db.Uuid
+  type        RequestType
+  status      RequestStatus @default(NEW)
+  source      RequestSource
+  title       String
+  description String
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  tasks    Task[]
+  comments Comment[]
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  @@index([projectId, status])
+  @@index([createdById])
+  @@index([source])
+  @@map("requests")
+}
+
+model Task {
+  id          String  @id @default(uuid()) @db.Uuid
+  projectId   String  @map("project_id") @db.Uuid
+  stageId     String? @map("stage_id") @db.Uuid
+  requestId   String? @map("request_id") @db.Uuid
+  createdById String  @map("created_by_id") @db.Uuid
+  assigneeId  String? @map("assignee_id") @db.Uuid
+
+  title       String
+  description String?
+  status      TaskStatus   @default(NEW)
+  priority    TaskPriority @default(NORMAL)
+
+  externalProvider String? @map("external_provider")
+  externalTaskId   String? @map("external_task_id")
+  externalUrl      String? @map("external_url")
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage     Stage?   @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  request   Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  createdBy User     @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignee  User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([projectId, status])
+  @@index([stageId])
+  @@index([requestId])
+  @@index([assigneeId])
+  @@index([externalProvider, externalTaskId])
+  @@map("tasks")
+}
+
+model Material {
+  id          String @id @default(uuid()) @db.Uuid
+  projectId   String @map("project_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+
+  title       String
+  description String?
+  type        MaterialType
+  visibility  Visibility   @default(INTERNAL)
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("MaterialCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  versions MaterialVersion[]
+  comments Comment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId, visibility])
+  @@index([createdById])
+  @@map("materials")
+}
+
+model MaterialVersion {
+  id          String @id @default(uuid()) @db.Uuid
+  materialId  String @map("material_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+
+  versionNumber Int                   @map("version_number")
+  status        MaterialVersionStatus @default(DRAFT)
+  changeSummary String?               @map("change_summary")
+
+  previousVersionId String? @map("previous_version_id") @db.Uuid
+
+  provider          String?
+  externalUrl       String? @map("external_url")
+  externalFileId    String? @map("external_file_id")
+  externalVersionId String? @map("external_version_id")
+
+  material  Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("VersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  previousVersion MaterialVersion?  @relation("VersionHistory", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersions    MaterialVersion[] @relation("VersionHistory")
+
+  files      File[]
+  comments   Comment[]
+  approvals  Approval[]
+  selections Selection[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([materialId, versionNumber])
+  @@index([materialId, status])
+  @@index([createdById])
+  @@index([previousVersionId])
+  @@map("material_versions")
+}
+
+model File {
+  id                String @id @default(uuid()) @db.Uuid
+  materialVersionId String @map("material_version_id") @db.Uuid
+
+  provider       String
+  externalFileId String  @map("external_file_id")
+  filename       String
+  mimeType       String? @map("mime_type")
+  size           BigInt?
+  url            String?
+
+  materialVersion MaterialVersion @relation(fields: [materialVersionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([materialVersionId])
+  @@index([provider, externalFileId])
+  @@map("files")
+}
+
+model Comment {
+  id                String  @id @default(uuid()) @db.Uuid
+  projectId         String  @map("project_id") @db.Uuid
+  authorId          String  @map("author_id") @db.Uuid
+  materialId        String? @map("material_id") @db.Uuid
+  materialVersionId String? @map("material_version_id") @db.Uuid
+  requestId         String? @map("request_id") @db.Uuid
+  parentId          String? @map("parent_id") @db.Uuid
+
+  text       String
+  visibility Visibility @default(CLIENT)
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author          User             @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  material        Material?        @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  materialVersion MaterialVersion? @relation(fields: [materialVersionId], references: [id], onDelete: SetNull)
+  request         Request?         @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies Comment[] @relation("CommentThread")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId, visibility])
+  @@index([authorId])
+  @@index([materialId])
+  @@index([materialVersionId])
+  @@index([requestId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model Message {
+  id        String @id @default(uuid()) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  authorId  String @map("author_id") @db.Uuid
+
+  channel    MessageChannel
+  text       String?
+  visibility Visibility     @default(CLIENT)
+
+  contextType String? @map("context_type")
+  contextId   String? @map("context_id")
+
+  externalMessageId String? @map("external_message_id")
+  replyToId         String? @map("reply_to_id") @db.Uuid
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User    @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  replyTo Message?  @relation("MessageThread", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies Message[] @relation("MessageThread")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([authorId])
+  @@index([channel])
+  @@index([contextType, contextId])
+  @@index([externalMessageId])
+  @@index([replyToId])
+  @@map("messages")
+}
+
+model Approval {
+  id                String  @id @default(uuid()) @db.Uuid
+  projectId         String  @map("project_id") @db.Uuid
+  materialVersionId String  @map("material_version_id") @db.Uuid
+  requestedById     String  @map("requested_by_id") @db.Uuid
+  approvedById      String? @map("approved_by_id") @db.Uuid
+
+  status  ApprovalStatus
+  comment String?
+
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  approvedAt  DateTime? @map("approved_at")
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materialVersion MaterialVersion @relation(fields: [materialVersionId], references: [id], onDelete: Restrict)
+  requestedBy     User            @relation("ApprovalRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy      User?           @relation("ApprovalApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([materialVersionId])
+  @@index([requestedById])
+  @@index([approvedById])
+  @@map("approvals")
+}
+
+model Decision {
+  id          String @id @default(uuid()) @db.Uuid
+  projectId   String @map("project_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+
+  title       String
+  description String
+
+  sourceType DecisionSourceType? @map("source_type")
+  sourceId   String?             @map("source_id")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("DecisionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([createdById])
+  @@index([sourceType, sourceId])
+  @@map("decisions")
+}
+
+model Selection {
+  id                String @id @default(uuid()) @db.Uuid
+  projectId         String @map("project_id") @db.Uuid
+  materialVersionId String @map("material_version_id") @db.Uuid
+  createdById       String @map("created_by_id") @db.Uuid
+
+  selectedValue Json @map("selected_value")
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  materialVersion MaterialVersion @relation(fields: [materialVersionId], references: [id], onDelete: Restrict)
+  createdBy       User            @relation("SelectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([materialVersionId])
+  @@index([createdById])
+  @@map("selections")
+}
+
+model Event {
+  id        String  @id @default(uuid()) @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  actorId   String? @map("actor_id") @db.Uuid
+
+  eventType  EventType
+  entityType String    @map("entity_type")
+  entityId   String?   @map("entity_id")
+
+  visibility Visibility @default(CLIENT)
+  metadata   Json?
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor         User?          @relation("EventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([projectId, visibility, createdAt])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([eventType])
+  @@map("events")
+}
+
+model Notification {
+  id          String  @id @default(uuid()) @db.Uuid
+  projectId   String  @map("project_id") @db.Uuid
+  recipientId String  @map("recipient_id") @db.Uuid
+  eventId     String? @map("event_id") @db.Uuid
+
+  channel NotificationChannel
+  type    NotificationType
+  status  NotificationStatus  @default(PENDING)
+
+  externalMessageId String? @map("external_message_id")
+
+  sentAt DateTime? @map("sent_at")
+  readAt DateTime? @map("read_at")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recipient User    @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  event     Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([recipientId, status])
+  @@index([eventId])
+  @@index([channel, status])
+  @@map("notifications")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
