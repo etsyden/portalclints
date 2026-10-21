@@ -5,6 +5,8 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface LoginResponse {
@@ -34,7 +36,6 @@ export async function login(
   });
 
   saveAuth(result);
-
   return result;
 }
 
@@ -47,7 +48,6 @@ export async function register(
   });
 
   saveAuth(result);
-
   return result;
 }
 
@@ -62,23 +62,17 @@ export async function refreshAccessToken(): Promise<LoginResponse> {
     '/auth/refresh',
     {
       method: 'POST',
-      body: JSON.stringify({
-        refreshToken,
-      }),
+      body: JSON.stringify({ refreshToken }),
     },
-    {
-      skipRefresh: true,
-    },
+    { skipRefresh: true },
   );
 
   saveAuth(result);
-
   return result;
 }
 
 export async function logout(): Promise<void> {
-  const refreshToken =
-    localStorage.getItem('refreshToken');
+  const refreshToken = localStorage.getItem('refreshToken');
 
   try {
     if (refreshToken) {
@@ -86,13 +80,9 @@ export async function logout(): Promise<void> {
         '/auth/logout',
         {
           method: 'POST',
-          body: JSON.stringify({
-            refreshToken,
-          }),
+          body: JSON.stringify({ refreshToken }),
         },
-        {
-          skipRefresh: true,
-        },
+        { skipRefresh: true },
       );
     }
   } finally {
@@ -101,27 +91,22 @@ export async function logout(): Promise<void> {
 }
 
 export async function getMe(): Promise<AuthUser> {
-  return apiRequest<AuthUser>('/auth/me');
+  const user = await apiRequest<AuthUser>('/auth/me');
+  saveStoredUser(user);
+  return user;
 }
 
-export function saveAuth(result: LoginResponse) {
-  localStorage.setItem(
-    'accessToken',
-    result.accessToken,
-  );
-
-  localStorage.setItem(
-    'refreshToken',
-    result.refreshToken,
-  );
-
-  localStorage.setItem(
-    'user',
-    JSON.stringify(result.user),
-  );
+export function saveStoredUser(user: AuthUser): void {
+  localStorage.setItem('user', JSON.stringify(user));
 }
 
-export function clearAuth() {
+export function saveAuth(result: LoginResponse): void {
+  localStorage.setItem('accessToken', result.accessToken);
+  localStorage.setItem('refreshToken', result.refreshToken);
+  saveStoredUser(result.user);
+}
+
+export function clearAuth(): void {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
@@ -135,8 +120,57 @@ export function getStoredUser(): AuthUser | null {
   }
 
   try {
-    return JSON.parse(user);
+    return JSON.parse(user) as AuthUser;
   } catch {
     return null;
   }
+}
+
+
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+  const token = localStorage.getItem('accessToken');
+
+  const response = await fetch('http://localhost:3000/auth/me/avatar', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: (() => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      return formData;
+    })(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message || `Не удалось загрузить аватар (${response.status})`);
+  }
+
+  const user = await response.json() as AuthUser;
+  saveStoredUser(user);
+  return user;
+}
+
+export async function forgotPassword(email: string) {
+  return apiRequest(
+    '/auth/forgot-password',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    },
+    { skipRefresh: true },
+  );
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+) {
+  return apiRequest(
+    '/auth/reset-password',
+    {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    },
+    { skipRefresh: true },
+  );
 }

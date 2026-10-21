@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --runInBand",
     "postinstall": "prisma skills sync || exit 0"
   },
   "keywords": [],
@@ -25,6 +25,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^18.0.5",
+    "nodemailer": "^10.1.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.1",
@@ -33,8 +34,14 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.18",
+    "@swc/jest": "^0.2.39",
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/multer": "^2.3.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport-jwt": "^4.0.1",
+    "jest": "^30.5.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
